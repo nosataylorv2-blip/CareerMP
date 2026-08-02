@@ -1,0 +1,37 @@
+{
+  "server": {
+    "autoUpdate": false,
+    "autoExit": true,
+    "longWindowMax": 10000,
+    "shortWindowMax": 1000,
+    "longWindowSeconds": 300,
+    "shortWindowSeconds": 30,
+    "allowTransactions": true,
+    "sessionSendingMax": 100000,
+    "sessionReceiveMax": 200000
+  },
+  "client": {
+    "localUnicycleGhost": false,
+    "remoteUnicycleGhost": true,
+    "remoteVehicleGhost": false,
+    "serverSaveName": "",
+    "serverSaveSuffix": "",
+    "serverSaveNameEnabled": false,
+    "roadTrafficAmount": 0,
+    "extraTrafficAmount": 0,
+    "parkedTrafficAmount": 0,
+    "roadTrafficEnabled": false,
+    "extraTrafficEnabled": false,
+    "parkedTrafficEnabled": false,
+    "worldEditorEnabled": false,
+    "consoleEnabled": false,
+    "simplifyRemoteVehicles": false,
+    "spawnVehicleIgnitionLevel": 3,
+    "skipOtherPlayersVehicles": false,
+    "enableSpawnQueue": false,
+    "autoSyncVehicles": true,
+    "trafficSmartSelections": true,
+    "trafficSimpleVehicles": true,
+    "trafficAllowMods": false
+  }
+}
