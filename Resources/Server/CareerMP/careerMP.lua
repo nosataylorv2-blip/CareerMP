@@ -1,12 +1,12 @@
 --CareerMP (SERVER) by Dudekahedron, 2026
 --Thanks to Bouboule, and Lion and Luuk from BeamPaint, for http request examples
 
-local HARD_CLIENT_VERSION = {major = 0, minor = 0, revision = 37}
-local HARD_SERVER_VERSION = {major = 0, minor = 0, revision = 37}
+local HARD_CLIENT_VERSION = {major = 0, minor = 39, revision = 14}
+local HARD_SERVER_VERSION = {major = 0, minor = 39, revision = 8}
 
 local RAW = "https://raw.githubusercontent.com/"
-local GITHUB_REPO = "StanleyDudek/CareerMP/"
-local BRANCH = "main/"
+local GITHUB_REPO = "nosataylorv2-blip/CareerMP/"
+local BRANCH = "0.39/"
 local CLIENT_PATH = "Resources/Client/"
 local CLIENT_FILE = "CareerMP.zip"
 local SERVER_PATH = "Resources/Server/CareerMP/"
@@ -24,7 +24,7 @@ local willExit = false
 
 local defaultConfig = {
 	server = {
-		autoUpdate = true,
+		autoUpdate = false,
 		autoExit = true,
 		longWindowMax = 10000,
 		shortWindowMax = 1000,
@@ -50,7 +50,7 @@ local defaultConfig = {
 		worldEditorEnabled = false,
 		consoleEnabled = false,
 		simplifyRemoteVehicles = false,
-		spawnVehicleIgnitionLevel = 0,
+		spawnVehicleIgnitionLevel = 3,
 		skipOtherPlayersVehicles = false,
 		trafficSmartSelections = true,
 		trafficSimpleVehicles = true,
@@ -61,7 +61,6 @@ local defaultConfig = {
 local pendingActivation = {}
 local activationThreshold = 90
 local vehicleStates = {}
-local loadedPrefabs = {}
 
 local signalTimer = MP.CreateTimer()
 
@@ -128,14 +127,23 @@ local function updateClient()
 	local installed = FS.Exists(CLIENT_PATH .. CLIENT_FILE)
 	if not installed then
 		print("[CareerMP] ---------- CareerMP Update Client not installed, downloading...")
-		downloadFile(CLIENT_URL, CLIENT_PATH .. CLIENT_FILE)
+		if not downloadFile(CLIENT_URL, CLIENT_PATH .. CLIENT_FILE) then
+			print("[CareerMP] ---------- CareerMP Update Failed to download client!")
+			return false
+		end
 	end
 	if not installedVersion then
         print("[CareerMP] ---------- CareerMP Update Applying self version!")
 		installedVersion = HARD_CLIENT_VERSION
 		WriteJson(SERVER_PATH .. CLIENT_VERSION_FILE, HARD_CLIENT_VERSION)
 	end
-    local latestVersionFile = downloadVersionFile(CLIENT_UPDATE_URL, SERVER_PATH .. CLIENT_VERSION_FILE)
+	local latestVersionPath = SERVER_PATH .. CLIENT_VERSION_FILE .. ".latest"
+	local latestVersionFile = downloadVersionFile(CLIENT_UPDATE_URL, latestVersionPath)
+	os.remove(latestVersionPath)
+    if type(latestVersionFile) ~= "string" or latestVersionFile == "" then
+        print("[CareerMP] ---------- CareerMP Update Failed to fetch latest client version!")
+        return false
+    end
 	local latest = Util.JsonDecode(latestVersionFile)
     if not latest then
         print("[CareerMP] ---------- CareerMP Update Failed to fetch latest client version!")
@@ -145,9 +153,13 @@ local function updateClient()
     if installedVersion then
         print("[CareerMP] ---------- CareerMP Update Client installed: " .. installedVersion.major .. "." .. installedVersion.minor .. "." .. installedVersion.revision)
         print("[CareerMP] ---------- CareerMP Update Client latest: " .. latest.major .. "." .. latest.minor .. "." .. latest.revision)
-        if update then
+		if update then
 			print("[CareerMP] ---------- CareerMP Update Updating client...")
-			downloadFile(CLIENT_URL, CLIENT_PATH .. CLIENT_FILE)
+			if not downloadFile(CLIENT_URL, CLIENT_PATH .. CLIENT_FILE) then
+				print("[CareerMP] ---------- CareerMP Update Failed to download client!")
+				return false
+			end
+			WriteJson(SERVER_PATH .. CLIENT_VERSION_FILE, latest)
 			print("[CareerMP] ---------- CareerMP Update Client updated to " ..  latest.major .. "." .. latest.minor .. "." .. latest.revision .. "! Restart the server to apply the update!")
 		else
 			print("[CareerMP] ---------- CareerMP Update Client up to date!")
@@ -155,7 +167,11 @@ local function updateClient()
 		end
 	else
 		print("[CareerMP] ---------- CareerMP Update Client version not found.")
-        downloadFile(CLIENT_URL, CLIENT_PATH .. CLIENT_FILE)
+		if not downloadFile(CLIENT_URL, CLIENT_PATH .. CLIENT_FILE) then
+			print("[CareerMP] ---------- CareerMP Update Failed to download client!")
+			return false
+		end
+		WriteJson(SERVER_PATH .. CLIENT_VERSION_FILE, latest)
         print("[CareerMP] ---------- CareerMP Update Client version updated to " ..  latest.major .. "." .. latest.minor .. "." .. latest.revision .. "! Restart the server to apply the update!")
     end
 	return update
@@ -166,14 +182,23 @@ local function updateServer()
 	local installed = FS.Exists(SERVER_PATH .. SERVER_FILE)
 	if not installed then
 		print("[CareerMP] ---------- CareerMP Update Server not installed, downloading...")
-		downloadFile(SERVER_URL, SERVER_PATH .. SERVER_FILE)
+		if not downloadFile(SERVER_URL, SERVER_PATH .. SERVER_FILE) then
+			print("[CareerMP] ---------- CareerMP Update Failed to download server!")
+			return false
+		end
 	end
 	if not installedVersion then
         print("[CareerMP] ---------- CareerMP Update Applying self version!")
 		installedVersion = HARD_SERVER_VERSION
 		WriteJson(SERVER_PATH .. SERVER_VERSION_FILE, HARD_SERVER_VERSION)
 	end
-    local latestVersionFile = downloadVersionFile(SERVER_UPDATE_URL, SERVER_PATH .. SERVER_VERSION_FILE)
+	local latestVersionPath = SERVER_PATH .. SERVER_VERSION_FILE .. ".latest"
+	local latestVersionFile = downloadVersionFile(SERVER_UPDATE_URL, latestVersionPath)
+	os.remove(latestVersionPath)
+    if type(latestVersionFile) ~= "string" or latestVersionFile == "" then
+        print("[CareerMP] ---------- CareerMP Update Failed to fetch latest server version")
+        return false
+    end
     local latest = Util.JsonDecode(latestVersionFile)
     if not latest then
         print("[CareerMP] ---------- CareerMP Update Failed to fetch latest server version")
@@ -183,9 +208,13 @@ local function updateServer()
     if installedVersion then
         print("[CareerMP] ---------- CareerMP Update Server installed: " .. installedVersion.major .. "." .. installedVersion.minor .. "." .. installedVersion.revision)
         print("[CareerMP] ---------- CareerMP Update Server latest: " .. latest.major .. "." .. latest.minor .. "." .. latest.revision)
-        if update then
+		if update then
 			print("[CareerMP] ---------- CareerMP Update Updating server...")
-			downloadFile(SERVER_URL, SERVER_PATH .. SERVER_FILE)
+			if not downloadFile(SERVER_URL, SERVER_PATH .. SERVER_FILE) then
+				print("[CareerMP] ---------- CareerMP Update Failed to download server!")
+				return false
+			end
+			WriteJson(SERVER_PATH .. SERVER_VERSION_FILE, latest)
 			print("[CareerMP] ---------- CareerMP Update Server updated to " ..  latest.major .. "." .. latest.minor .. "." .. latest.revision .. "! Restart the server to apply the update!")
 		else
 			print("[CareerMP] ---------- CareerMP Update Server up to date!")
@@ -193,7 +222,11 @@ local function updateServer()
 		end
 	else
 		print("[CareerMP] ---------- CareerMP Update Server version not found.")
-        downloadFile(SERVER_URL, SERVER_PATH .. SERVER_FILE)
+		if not downloadFile(SERVER_URL, SERVER_PATH .. SERVER_FILE) then
+			print("[CareerMP] ---------- CareerMP Update Failed to download server!")
+			return false
+		end
+		WriteJson(SERVER_PATH .. SERVER_VERSION_FILE, latest)
         print("[CareerMP] ---------- CareerMP Update Server version updated to " ..  latest.major .. "." .. latest.minor .. "." .. latest.revision .. "! Restart the server to apply the update!")
     end
 	return update
@@ -314,21 +347,9 @@ function onInit()
 
 	MP.RegisterEvent("payPlayer","payPlayer")
 
-	MP.RegisterEvent("careerPrefabSync","careerPrefabSync")
 	MP.RegisterEvent("careerSyncRequested","careerSyncRequested")
-	MP.RegisterEvent("prefabSyncRequested","prefabSyncRequested")
 	MP.RegisterEvent("careerVehSyncRequested","careerVehSyncRequested")
 	MP.RegisterEvent("careerVehicleActiveHandler","careerVehicleActiveHandler")
-
-	MP.RegisterEvent("txUpdateDisplay", "txUpdateDisplay")
-	MP.RegisterEvent("txUpdateWinnerLight", "txUpdateWinnerLight")
-	MP.RegisterEvent("txUpdateBlueLight", "txUpdateBlueLight")
-	MP.RegisterEvent("txUpdatePreStageLight", "txUpdatePreStageLight")
-	MP.RegisterEvent("txUpdateStageLight", "txUpdateStageLight")
-	MP.RegisterEvent("txUpdateDisqualifiedLight", "txUpdateDisqualifiedLight")
-	MP.RegisterEvent("txUpdateTreeLights", "txUpdateTreeLights")
-	MP.RegisterEvent("txClearDisplay", "txClearDisplay")
-	MP.RegisterEvent("txClearAll", "txClearAll")
 
 	MP.RegisterEvent("speedTrap", "speedTrap")
 	MP.RegisterEvent("redLight", "redLight")
@@ -357,10 +378,9 @@ function onInit()
 		if not FS.IsDirectory(SERVER_PATH .. "/versions") then
 			FS.CreateDirectory(SERVER_PATH .. "/versions")
 		end
-		local update
-		update = updateClient()
-		update = updateServer()
-		if update and Config.server.autoExit then
+		local clientUpdated = updateClient()
+		local serverUpdated = updateServer()
+		if (clientUpdated or serverUpdated) and Config.server.autoExit then
 			willExit = true
 		end
 	end
@@ -370,6 +390,16 @@ end
 
 function perPartPaintingHandler(player_id, data)
 	local paintData = Util.JsonDecode(data)
+	if type(paintData) ~= "table"
+		or type(paintData.serverVehicleID) ~= "string"
+		or type(paintData.paints) ~= "table"
+		or type(paintData.partPath) ~= "string" then
+		return
+	end
+	local ownerID = tonumber(paintData.serverVehicleID:match("^(%d+)%-"))
+	if ownerID ~= player_id then
+		return
+	end
 	if not paintData.originID then
 		for id in pairs(MP.GetPlayers()) do
 			if player_id ~= id then
@@ -377,13 +407,22 @@ function perPartPaintingHandler(player_id, data)
 			end
 		end
 	else
-		MP.TriggerClientEvent(paintData.originID, "rxRemotePartPaint", data)
+		paintData.originID = tonumber(paintData.originID)
+		if paintData.originID and MP.IsPlayerConnected(paintData.originID) then
+			MP.TriggerClientEventJson(paintData.originID, "rxRemotePartPaint", paintData)
+		end
 	end
 end
 
 function requestPartPaintsHandler(player_id, data)
 	local requestData = Util.JsonDecode(data)
-	local targetID = tonumber(requestData.serverVehicleID:sub(1,1))
+	if type(requestData) ~= "table" or type(requestData.serverVehicleID) ~= "string" then
+		return
+	end
+	local targetID = tonumber(requestData.serverVehicleID:match("^(%d+)%-"))
+	if not targetID or not MP.IsPlayerConnected(targetID) then
+		return
+	end
 	requestData.originID = player_id
 	MP.TriggerClientEventJson(targetID, "rxRequestPartPaints", requestData)
 end
@@ -448,6 +487,18 @@ end
 
 function payPlayer(player_id, data)
 	local paymentData = Util.JsonDecode(data)
+	if type(paymentData) ~= "table" then
+		return
+	end
+	paymentData.target_player_id = tonumber(paymentData.target_player_id)
+	paymentData.money = tonumber(paymentData.money)
+	if not paymentData.target_player_id or not paymentData.money
+		or paymentData.money ~= paymentData.money
+		or paymentData.money <= 0
+		or paymentData.money == math.huge
+		or paymentData.target_player_id == player_id then
+		return
+	end
 	paymentData.sender = MP.GetPlayerName(player_id)
 	if Config.server.allowTransactions then
 		if MP.IsPlayerConnected(paymentData.target_player_id) then
@@ -462,78 +513,6 @@ function payPlayer(player_id, data)
 		end
 	else
 		MP.TriggerClientEventJson(player_id, "rxDeny", paymentData)
-	end
-end
-
-function txUpdateDisplay(player_id, data)
-	for id in pairs(MP.GetPlayers()) do
-		if player_id ~= id then
-			MP.TriggerClientEvent(id, "rxUpdateDisplay", data)
-		end
-	end
-end
-
-function txUpdateWinnerLight(player_id, data)
-	for id in pairs(MP.GetPlayers()) do
-		if player_id ~= id then
-			MP.TriggerClientEvent(id, "rxUpdateWinnerLight", data)
-		end
-	end
-end
-
-function txUpdateBlueLight(player_id, data)
-	for id in pairs(MP.GetPlayers()) do
-		if player_id ~= id then
-			MP.TriggerClientEvent(id, "rxUpdateBlueLight", data)
-		end
-	end
-end
-
-function txUpdatePreStageLight(player_id, data)
-	for id in pairs(MP.GetPlayers()) do
-		if player_id ~= id then
-			MP.TriggerClientEvent(id, "rxUpdatePreStageLight", data)
-		end
-	end
-end
-
-function txUpdateStageLight(player_id, data)
-	for id in pairs(MP.GetPlayers()) do
-		if player_id ~= id then
-			MP.TriggerClientEvent(id, "rxUpdateStageLight", data)
-		end
-	end
-end
-
-function txUpdateDisqualifiedLight(player_id, data)
-	for id in pairs(MP.GetPlayers()) do
-		if player_id ~= id then
-			MP.TriggerClientEvent(id, "rxUpdateDisqualifiedLight", data)
-		end
-	end
-end
-
-function txUpdateTreeLights(player_id, data)
-	for id in pairs(MP.GetPlayers()) do
-		if player_id ~= id then
-			MP.TriggerClientEvent(id, "rxUpdateTreeLights", data)
-		end
-	end
-end
-
-function txClearDisplay(player_id)
-	for id in pairs(MP.GetPlayers()) do
-		if player_id ~= id then
-			MP.TriggerClientEvent(id, "rxClearDisplay", "")
-		end
-	end
-end
-
-function txClearAll(player_id)
-	for id in pairs(MP.GetPlayers()) do
-		if player_id ~= id then
-			MP.TriggerClientEvent(id, "rxClearAll", "")
-		end
 	end
 end
 
@@ -575,39 +554,24 @@ function careerVehSyncRequested(player_id)
 	MP.TriggerClientEventJson(player_id, "rxCareerVehSync", vehicleStates)
 end
 
-function careerPrefabSync(player_id, data)
-	local prefab = Util.JsonDecode(data)
-	if prefab.pLoad == true then
-		loadedPrefabs[player_id][prefab.pName] = prefab
-	elseif prefab.pLoad == false then
-		loadedPrefabs[player_id][prefab.pName] = nil
-	end
-	for id in pairs(MP.GetPlayers()) do
-		if player_id ~= id then
-			MP.TriggerClientEvent(id, "rxPrefabSync", data)
-		end
-	end
-end
-
 function careerSyncRequested(player_id)
 	MP.TriggerClientEventJson(player_id, "rxCareerSync", Config.client)
-	pendingActivation[player_id].careerActive = true
-end
-
-function prefabSyncRequested(player_id)
-	for id in pairs(MP.GetPlayers()) do
-		if player_id ~= id then
-			if loadedPrefabs[id] then
-				for k,v in pairs(loadedPrefabs[id]) do
-					MP.TriggerClientEventJson(player_id, "rxPrefabSync", loadedPrefabs[id][k])
-				end
-			end
-		end
+	if pendingActivation[player_id] then
+		pendingActivation[player_id].careerActive = true
 	end
 end
 
 function careerVehicleActiveHandler(player_id, data)
 	local vehicleData = Util.JsonDecode(data)
+	if type(vehicleData) ~= "table"
+		or type(vehicleData.serverVehicleID) ~= "string"
+		or type(vehicleData.active) ~= "boolean" then
+		return
+	end
+	local ownerID = tonumber(vehicleData.serverVehicleID:match("^(%d+)%-"))
+	if ownerID ~= player_id then
+		return
+	end
 	if vehicleStates[vehicleData.serverVehicleID] then
 		vehicleStates[vehicleData.serverVehicleID].active = vehicleData.active
 	else
@@ -641,7 +605,6 @@ function tick()
 end
 
 function onPlayerJoinHandler(player_id)
-	loadedPrefabs[player_id] = {}
 	pendingActivation[player_id] = {
 		joinTimestamp = signalTimer:GetCurrent(),
 		careerActive = false
@@ -670,10 +633,16 @@ function onVehicleDeletedHandler(player_id, vehicle_id)
 end
 
 function onPlayerDisconnectHandler(player_id)
-	loadedPrefabs[player_id] = nil
+	local ownerPrefix = tostring(player_id) .. "-"
+	for serverVehicleID in pairs(vehicleStates) do
+		if serverVehicleID:sub(1, #ownerPrefix) == ownerPrefix then
+			vehicleStates[serverVehicleID] = nil
+		end
+	end
 	ledger.send[player_id] = nil
 	ledger.receive[player_id] = nil
 	pendingActivation[player_id] = nil
+	MP.TriggerClientEventJson(-1, "rxCareerVehSync", vehicleStates)
 end
 
 function onConsoleInputHandler(message)
@@ -682,7 +651,7 @@ function onConsoleInputHandler(message)
 		return ""
 	end
 	local commandPrefix = message:sub(1, space)
-	if commandPrefix == "CareerMP " or "CMP " then
+	if commandPrefix == "CareerMP " or commandPrefix == "CMP " then
 		local prefixLen = commandPrefix:len()
 		message = message:sub(prefixLen + 1)
 		local command = message
@@ -745,10 +714,9 @@ function Update(arguments)
 	if not FS.IsDirectory(SERVER_PATH .. "/versions") then
 		FS.CreateDirectory(SERVER_PATH .. "/versions")
 	end
-	local update
-	update = updateClient()
-	update = updateServer()
-	if update and Config.server.autoExit then
+	local clientUpdated = updateClient()
+	local serverUpdated = updateServer()
+	if (clientUpdated or serverUpdated) and Config.server.autoExit then
 		willExit = true
 	end
 end
